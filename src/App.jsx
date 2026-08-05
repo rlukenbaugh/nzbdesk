@@ -3,17 +3,9 @@ import {
   Activity, BookOpen, Bot, Boxes, ChevronDown, ChevronRight, CirclePause,
   CirclePlay, Cloud, Download, Filter, Gauge, History, LayoutGrid, List,
   Menu, MoreVertical, Pause, Play, Plus, Radio, RefreshCw, Search, Server,
-  Settings, SlidersHorizontal, Trash2, X,
+  Settings, SlidersHorizontal, X,
 } from 'lucide-react'
-
-const initialJobs = [
-  { id: 1, name: 'Linux.Distribution.2026.08.ISO', category: 'Software', age: '2h', size: '4.8 GB', progress: 82, eta: '11m', speed: '3.1 MB/s', status: 'Downloading' },
-  { id: 2, name: 'Nature.Documentary.S01E04.1080p', category: 'TV', age: '5h', size: '3.2 GB', progress: 46, eta: '24m', speed: '0.7 MB/s', status: 'Downloading' },
-  { id: 3, name: 'Jazz.Classics.Collection.FLAC', category: 'Audio', age: '1d', size: '8.6 GB', progress: 100, eta: '—', speed: '—', status: 'Verifying' },
-  { id: 4, name: 'Open.Source.Archive.Vol.12', category: 'Books', age: '3h', size: '1.1 GB', progress: 18, eta: 'Paused', speed: '—', status: 'Paused' },
-  { id: 5, name: 'Travel.Guide.Caribbean.2026', category: 'Books', age: '6h', size: '640 MB', progress: 100, eta: '—', speed: '—', status: 'Unpacking' },
-  { id: 6, name: 'Photography.Masterclass.Part.3', category: 'Video', age: '8h', size: '2.4 GB', progress: 0, eta: '—', speed: '—', status: 'Queued' },
-]
+import useSabnzbd from './useSabnzbd.js'
 
 const nav = [
   [Gauge, 'Dashboard'], [Search, 'Search'], [List, 'Queue', 6], [History, 'History'],
@@ -21,23 +13,17 @@ const nav = [
   [Bot, 'Automation'], [Settings, 'Settings'], [Activity, 'System', 1],
 ]
 
-const recent = [
-  ['Science.Fiction.Megapack.2026', '2 min ago', '12.4 GB', 'Video'],
-  ['Magazine.Collection.2026.Week.20', '15 min ago', '1.8 GB', 'Books'],
-  ['Linux.Kernel.Documentation.6.9', '32 min ago', '512 MB', 'Books'],
-]
-
 function IconButton({ icon: Icon, label, onClick, active = false }) {
   return <button className={`tool-button ${active ? 'active' : ''}`} onClick={onClick}><Icon size={22} strokeWidth={1.9} /><span>{label}</span></button>
 }
 
-function Sidebar({ open, close }) {
+function Sidebar({ open, close, queueCount }) {
   return <aside className={`sidebar ${open ? 'open' : ''}`}>
     <div className="brand">NZB<span>DESK</span></div>
     <nav aria-label="Primary">
       {nav.map(([Icon, label, count]) => (
         <button key={label} className={`nav-item ${label === 'Dashboard' ? 'selected' : ''}`} onClick={close}>
-          <Icon size={21} /><span>{label}</span>{count && <b>{count}</b>}
+          <Icon size={21} /><span>{label}</span>{(label === 'Queue' ? queueCount : count) > 0 && <b>{label === 'Queue' ? queueCount : count}</b>}
         </button>
       ))}
     </nav>
@@ -62,61 +48,82 @@ function JobRow({ job, expanded, onExpand, onToggle }) {
       <td><span className={`status ${job.status.toLowerCase()}`}>{job.status}</span></td>
       <td className="actions"><button onClick={onToggle} aria-label={paused ? 'Resume job' : 'Pause job'}>{paused ? <Play /> : <Pause />}</button><button aria-label="More actions"><ChevronDown /></button></td>
     </tr>
-    {expanded && <tr className="detail-row"><td colSpan="9"><div><b>Destination</b><span>D:\\Usenet\\{job.category}</span></div><div><b>Provider</b><span>Primary</span></div><div><b>Article health</b><span>100%</span></div><button>View job log</button></td></tr>}
+    {expanded && <tr className="detail-row"><td colSpan="9"><div><b>Job ID</b><span>{job.id}</span></div><div><b>Category</b><span>{job.category}</span></div><div><b>Current state</b><span>{job.status}</span></div><div><b>Size</b><span>{job.size}</span></div></td></tr>}
   </>
 }
 
-function ConnectionPanel() {
+function ConnectionPanel({ overview }) {
   return <aside className="connection-panel">
     <h2>Connection</h2>
-    <section><small>Provider</small><strong>Primary</strong><span className="healthy"><i />Healthy</span></section>
-    <section><small>Connections</small><strong>38 <em>/ 50</em></strong><div className="meter"><i /></div></section>
-    <section><small>Retention</small><strong>5,400 days</strong></section>
-    <section className="live"><div><small>Live activity</small><b>3.8 MB/s</b></div><svg viewBox="0 0 260 90" role="img" aria-label="Live download speed"><path d="M0 61 C15 30 27 72 40 43 S64 67 80 38 S107 61 121 52 S143 18 159 43 S183 71 199 40 S224 54 260 31" /></svg><div className="axis"><span>-60s</span><span>-30s</span><span>Now</span></div></section>
-    <button className="wide-button">View details <ChevronRight size={16} /></button>
+    <section><small>Downloader</small><strong>SABnzbd {overview.version}</strong><span className="healthy"><i />Connected</span></section>
+    <section><small>Queue</small><strong>{overview.totalCount} <em>jobs</em></strong><div className="meter"><i style={{ width: overview.paused ? '25%' : '100%' }} /></div></section>
+    <section><small>Remaining</small><strong>{overview.remaining}</strong></section>
+    <section className="live"><div><small>Live speed</small><b>{overview.speed}</b></div><svg viewBox="0 0 260 90" role="img" aria-label="Live download activity"><path d="M0 61 C15 30 27 72 40 43 S64 67 80 38 S107 61 121 52 S143 18 159 43 S183 71 199 40 S224 54 260 31" /></svg><div className="axis"><span>Time left</span><span>{overview.timeLeft}</span></div></section>
+    <a className="wide-button" href="http://127.0.0.1:8085" target="_blank" rel="noreferrer">Open SABnzbd <ChevronRight size={16} /></a>
   </aside>
 }
 
-function AddModal({ close, add }) {
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('TV')
-  return <div className="modal-backdrop" onMouseDown={close}><form className="modal" onMouseDown={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); if (name.trim()) add(name.trim(), category) }}>
-    <div className="modal-title"><div><h2>Add NZB</h2><p>Add a job to the local queue.</p></div><button type="button" onClick={close} aria-label="Close"><X /></button></div>
-    <label>NZB name<input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="Example.Release.Name" /></label>
-    <label>Category<select value={category} onChange={e => setCategory(e.target.value)}><option>TV</option><option>Video</option><option>Audio</option><option>Books</option><option>Software</option></select></label>
-    <div className="modal-actions"><button type="button" onClick={close}>Cancel</button><button className="primary" type="submit"><Plus size={17} />Add to queue</button></div>
+function AddModal({ close, add, categories }) {
+  const [url, setUrl] = useState('')
+  const [category, setCategory] = useState('*')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+  const submit = async event => {
+    event.preventDefault()
+    if (!url.trim()) return
+    setSubmitting(true)
+    setFormError('')
+    try { await add(url.trim(), category) } catch (error) { setFormError(error instanceof Error ? error.message : 'Could not add NZB'); setSubmitting(false) }
+  }
+  return <div className="modal-backdrop" onMouseDown={close}><form className="modal" onMouseDown={event => event.stopPropagation()} onSubmit={submit}>
+    <div className="modal-title"><div><h2>Add NZB URL</h2><p>Send an NZB link directly to SABnzbd.</p></div><button type="button" onClick={close} aria-label="Close"><X /></button></div>
+    <label>NZB URL<input type="url" autoFocus value={url} onChange={event => setUrl(event.target.value)} placeholder="https://indexer.example/get/…" required /></label>
+    <label>Category<select value={category} onChange={event => setCategory(event.target.value)}>{categories.map(item => <option key={item} value={item}>{item === '*' ? 'Default' : item}</option>)}</select></label>
+    {formError && <p className="form-error" role="alert">{formError}</p>}
+    <div className="modal-actions"><button type="button" onClick={close}>Cancel</button><button className="primary" type="submit" disabled={submitting}><Plus size={17} />{submitting ? 'Adding…' : 'Add to queue'}</button></div>
   </form></div>
 }
 
+function completedLabel(value) {
+  if (!value) return 'Recently'
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000))
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  return hours < 24 ? `${hours} hr ago` : `${Math.round(hours / 24)} d ago`
+}
+
 export default function App() {
-  const [jobs, setJobs] = useState(initialJobs)
+  const { data, categories, loading, error, refresh, action, addUrl } = useSabnzbd()
+  const jobs = data.jobs
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [modal, setModal] = useState(false)
   const [mobileNav, setMobileNav] = useState(false)
   const [statusFilter, setStatusFilter] = useState('All')
   const filtered = useMemo(() => jobs.filter(j => j.name.toLowerCase().includes(query.toLowerCase()) && (statusFilter === 'All' || j.status === statusFilter)), [jobs, query, statusFilter])
-  const toggleJob = id => setJobs(v => v.map(j => j.id === id ? { ...j, status: j.status === 'Paused' ? 'Downloading' : 'Paused', speed: j.status === 'Paused' ? '1.2 MB/s' : '—', eta: j.status === 'Paused' ? '18m' : 'Paused' } : j))
-  const setAll = paused => setJobs(v => v.map(j => ['Verifying', 'Unpacking'].includes(j.status) ? j : { ...j, status: paused ? 'Paused' : 'Downloading', speed: paused ? '—' : '1.2 MB/s', eta: paused ? 'Paused' : '18m' }))
-  const addJob = (name, category) => { setJobs(v => [...v, { id: Date.now(), name, category, age: 'Now', size: '—', progress: 0, eta: '—', speed: '—', status: 'Queued' }]); setModal(false) }
+  const toggleJob = job => action(job.status === 'Paused' ? 'resumeJob' : 'pauseJob', job.id).catch(() => {})
+  const setAll = paused => action(paused ? 'pauseAll' : 'resumeAll').catch(() => {})
+  const addJob = async (url, category) => { await addUrl(url, category); setModal(false) }
 
   return <div className="app-shell">
-    <Sidebar open={mobileNav} close={() => setMobileNav(false)} />
+    <Sidebar open={mobileNav} close={() => setMobileNav(false)} queueCount={data.totalCount} />
     {mobileNav && <button className="scrim" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
     <main>
       <header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(true)}><Menu /></button><div className="search"><Search size={20} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search Usenet" aria-label="Search Usenet" /></div><div className="top-icons"><BookOpen /><SlidersHorizontal /></div></header>
-      <section className="toolbar"><div><IconButton icon={Plus} label="Add NZB" onClick={() => setModal(true)} /><IconButton icon={RefreshCw} label="Refresh" /><IconButton icon={CirclePause} label="Pause All" onClick={() => setAll(true)} /><IconButton icon={CirclePlay} label="Resume All" onClick={() => setAll(false)} /><IconButton icon={Trash2} label="Clear Finished" onClick={() => setJobs(v => v.filter(j => j.progress < 100))} /></div><div><IconButton icon={LayoutGrid} label="Layout" /><IconButton icon={List} label="Sort" /><IconButton icon={Filter} label="Filter" active={statusFilter !== 'All'} onClick={() => setStatusFilter(v => v === 'All' ? 'Downloading' : v === 'Downloading' ? 'Paused' : 'All')} /></div></section>
+      <section className="toolbar"><div><IconButton icon={Plus} label="Add NZB" onClick={() => setModal(true)} /><IconButton icon={RefreshCw} label={loading ? 'Loading…' : 'Refresh'} onClick={() => refresh().catch(() => {})} /><IconButton icon={CirclePause} label="Pause All" onClick={() => setAll(true)} /><IconButton icon={CirclePlay} label="Resume All" onClick={() => setAll(false)} /></div><div><IconButton icon={LayoutGrid} label="Layout" /><IconButton icon={List} label="Sort" /><IconButton icon={Filter} label="Filter" active={statusFilter !== 'All'} onClick={() => setStatusFilter(v => v === 'All' ? 'Downloading' : v === 'Downloading' ? 'Paused' : 'All')} /></div></section>
       <div className="content">
-        <div className="heading"><h1>Download Queue</h1><p>{filtered.length} active · 3.8 MB/s · 42 min remaining</p></div>
+        {error && <div className="connection-error" role="alert"><strong>SABnzbd connection problem</strong><span>{error}</span><button onClick={() => refresh().catch(() => {})}>Try again</button></div>}
+        <div className="heading"><h1>Download Queue</h1><p>{data.totalCount} queued · {data.speed} · {data.timeLeft} remaining</p></div>
         <div className="dashboard-grid">
           <section className="queue-card"><div className="mobile-list">
-            {filtered.map(job => <article key={job.id}><div><strong>{job.name}</strong><span>{job.category} · {job.size} · {job.age}</span></div><Progress value={job.progress} status={job.status} /><footer><span className={`status ${job.status.toLowerCase()}`}>{job.status}</span><button onClick={() => toggleJob(job.id)}>{job.status === 'Paused' ? <Play /> : <Pause />}</button></footer></article>)}
-          </div><div className="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Age</th><th>Size</th><th>Progress</th><th>ETA</th><th>Speed</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filtered.map(job => <JobRow key={job.id} job={job} expanded={expanded === job.id} onExpand={() => setExpanded(expanded === job.id ? null : job.id)} onToggle={() => toggleJob(job.id)} />)}</tbody></table></div><div className="table-footer">Showing {filtered.length} of {jobs.length} entries <span>1</span></div></section>
-          <ConnectionPanel />
+            {filtered.map(job => <article key={job.id}><div><strong>{job.name}</strong><span>{job.category} · {job.size} · {job.age}</span></div><Progress value={job.progress} status={job.status} /><footer><span className={`status ${job.status.toLowerCase()}`}>{job.status}</span><button onClick={() => toggleJob(job)}>{job.status === 'Paused' ? <Play /> : <Pause />}</button></footer></article>)}
+          </div><div className="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Age</th><th>Size</th><th>Progress</th><th>ETA</th><th>Speed</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filtered.map(job => <JobRow key={job.id} job={job} expanded={expanded === job.id} onExpand={() => setExpanded(expanded === job.id ? null : job.id)} onToggle={() => toggleJob(job)} />)}</tbody></table></div><div className="table-footer">Showing {filtered.length} of {data.totalCount} entries <span>1</span></div></section>
+          <ConnectionPanel overview={data} />
         </div>
-        <section className="recent"><h2>Recent activity</h2><div className="recent-head"><span>Name</span><span>Status</span><span>Completed</span><span>Size</span><span>Category</span><span>Provider</span></div>{recent.map(item => <div className="recent-row" key={item[0]}><strong>{item[0]}</strong><span className="complete">✓ Completed</span><span>{item[1]}</span><span>{item[2]}</span><span>{item[3]}</span><span>Primary <MoreVertical size={16} /></span></div>)}</section>
+        <section className="recent"><h2>Recent activity</h2><div className="recent-head"><span>Name</span><span>Status</span><span>Completed</span><span>Size</span><span>Category</span><span>Downloader</span></div>{data.recent.map(item => <div className="recent-row" key={item.id}><strong>{item.name}</strong><span className="complete">✓ {item.status}</span><span>{completedLabel(item.completed)}</span><span>{item.size}</span><span>{item.category}</span><span>SABnzbd <MoreVertical size={16} /></span></div>)}</section>
       </div>
     </main>
-    {modal && <AddModal close={() => setModal(false)} add={addJob} />}
+    {modal && <AddModal close={() => setModal(false)} add={addJob} categories={categories} />}
   </div>
 }

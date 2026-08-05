@@ -11,6 +11,8 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "start": "node server.mjs",
+    "serve": "npm run build && node server.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview --host 127.0.0.1",

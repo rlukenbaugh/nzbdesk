@@ -5,5 +5,9 @@ coverage/
 .vite/
 design/
 public/posters/
+env.txt
+.env
+.env.*
+!.env.example
 *.log
 .DS_Store
