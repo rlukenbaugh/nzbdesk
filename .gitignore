@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+coverage/
+.vite/
+design/
+public/posters/
+*.log
+.DS_Store

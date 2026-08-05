@@ -1,0 +1,34 @@
+{
+  "name": "nzbdesk",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "description": "A polished local Usenet dashboard inspired by Radarr's workflow.",
+  "homepage": "https://github.com/rlukenbaugh/nzbdesk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rlukenbaugh/nzbdesk.git"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "vitest": "latest"
+  }
+}
